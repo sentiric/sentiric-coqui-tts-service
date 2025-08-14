@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentiric-tts-coqui-service"
+version = "0.1.0"
+description = "Expert TTS engine using Coqui XTTS for the Sentiric Platform."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "structlog",
+    "prometheus-fastapi-instrumentator",
+    "httpx",
+    "soundfile",
+    "numpy",
+    "torch==2.3.0",
+    "torchaudio==2.3.0",
+    "transformers==4.39.3",
+    "TTS @ git+https://github.com/azmisahin-forks/coqui-TTS.git@sentiric"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pytest-mock",
+]
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
