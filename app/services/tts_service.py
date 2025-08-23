@@ -1,3 +1,5 @@
+### File: `sentiric-tts-coqui-service/app/services/tts_service.py`
+
 import io
 import asyncio
 import numpy as np
@@ -10,10 +12,28 @@ import os
 from typing import Optional
 from TTS.api import TTS
 from app.core.config import settings
+from urllib.parse import urlparse # YENİ: URL parse etmek için
 
 logger = structlog.get_logger(__name__)
 
+# YENİ: Güvenilir alan adları için beyaz liste
+ALLOWED_SPEAKER_DOMAINS = {"sentiric.github.io"}
+
+def is_allowed_speaker_url(url: str) -> bool:
+    """SSRF saldırılarını önlemek için URL'yi doğrular."""
+    try:
+        parsed_url = urlparse(url)
+        # Sadece http ve https şemalarına ve beyaz listedeki domainlere izin ver
+        return parsed_url.scheme in ('http', 'https') and parsed_url.hostname in ALLOWED_SPEAKER_DOMAINS
+    except Exception:
+        return False
+
 async def download_temp_wav(url: str) -> str:
+    # GÜVENLİK KONTROLÜ
+    if not is_allowed_speaker_url(url):
+        logger.warning("SSRF_ATTEMPT: İzin verilmeyen bir speaker URL'i engellendi.", url=url)
+        raise ValueError("Provided speaker URL is not allowed.")
+
     async with httpx.AsyncClient() as client:
         response = await client.get(url, follow_redirects=True, timeout=10.0)
         response.raise_for_status()
@@ -39,12 +59,7 @@ class CoquiTTSEngine:
         if self.model: return
         try:
             self.logger.info("Coqui XTTS Modeli yükleniyor...", device=self.device)
-
-            # --- EN KRİTİK DÜZELTME BURADA ---
-            # Lisans onayını programatik olarak yapıyoruz.
-            # Bu, Docker'ın interaktif olmayan ortamında "EOFError" hatasını önler.
             os.environ["COQUI_TOS_AGREED"] = "1"
-
             self.model = TTS(settings.TTS_MODEL_NAME).to(self.device)
             self.logger.info("Coqui XTTS Modeli başarıyla yüklendi.")
         except Exception as e:
@@ -62,6 +77,7 @@ class CoquiTTSEngine:
         try:
             speaker_ref_path = settings.TTS_DEFAULT_SPEAKER_WAV_PATH
             if speaker_wav_path and speaker_wav_path.startswith("http"):
+                # GÜVENLİK: İndirme işlemi artık doğrulanmış bir fonksiyondan geçiyor.
                 temp_speaker_path = await download_temp_wav(speaker_wav_path)
                 speaker_ref_path = temp_speaker_path
             
